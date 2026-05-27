@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sunday Drives — Executive Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <!-- Leaflet Map CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0b0f19;
+            color: #f3f4f6;
+        }
+        .serif-font {
+            font-family: 'Playfair Display', serif;
+        }
+        /* Custom map styling to fit dark theme */
+        .leaflet-container {
+            background: #111827;
+            border-radius: 12px;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // BANNED locations to guarantee we never use them again
+        const BANNED_LOCATIONS = [
+            "Barnetts Lookout", "Berowra Waters Café", "Hawkesbury Lookout", "North Rocks Dam",
+            "Wentworth Falls Lookout", "Leura Village", "Govetts Leap Lookout", "Blackheath Café",
+            "Wisemans Ferry Lookout", "St Albans Village", "Webbs Creek Road", "Spencer Waterfront"
+        ];
+
+        // Hardcoded static data matching your exact configuration
+        const UPCOMING_DRIVES = [
+            {
+                date: "31 May 2026",
+                title: "Misty Hawkesbury Dawn",
+                distance: "145km",
+                duration: "4.5h",
+                stops: ["Wisemans Ferry Lookout", "St Albans Village", "Webbs Creek Road", "Spencer Waterfront"],
+                coords: [
+                    { name: "Parramatta CBD (Start)", lat: -33.815, lng: 151.0011 },
+                    { name: "Wisemans Ferry Lookout", lat: -33.3828, lng: 150.985 },
+                    { name: "St Albans Village", lat: -33.2842, lng: 150.9658 },
+                    { name: "Webbs Creek Road", lat: -33.385, lng: 150.98 },
+                    { name: "Spencer Waterfront", lat: -33.4542, lng: 151.15 }
+                ],
+                desc: "An atmospheric escape hugging the riverbanks. Early morning mist off the Hawkesbury makes for unforgettable, tranquil visuals.",
+                cafe: "Settlers Arms Inn / St Albans local bakery"
+            },
+            {
+                date: "7 Jun 2026",
+                title: "Blue Mountains Golden Hour",
+                distance: "165km",
+                duration: "5h",
+                stops: ["Wentworth Falls Lookout", "Leura Village", "Govetts Leap Lookout", "Blackheath Café"],
+                coords: [
+                    { name: "Parramatta CBD (Start)", lat: -33.815, lng: 151.0011 },
+                    { name: "Wentworth Falls Lookout", lat: -33.7258, lng: 150.3753 },
+                    { name: "Leura Village", lat: -33.7089, lng: 150.3344 },
+                    { name: "Govetts Leap Lookout", lat: -33.6289, lng: 150.3117 },
+                    { name: "Blackheath Café", lat: -33.6333, lng: 150.2833 }
+                ],
+                desc: "Slightly higher rev fluctuations suited for break-in, tracking up the Great Western Highway to dramatic cliff edges.",
+                cafe: "Blackheath General Store / Local Artisans"
+            },
+            {
+                date: "14 Jun 2026",
+                title: "Serene Hawkesbury Dawn",
+                distance: "150km",
+                duration: "4.5h",
+                stops: ["Barnetts Lookout", "Berowra Waters Café", "Hawkesbury Lookout", "North Rocks Dam"],
+                coords: [
+                    { name: "Parramatta CBD (Start)", lat: -33.815, lng: 151.0011 },
+                    { name: "Barnetts Lookout", lat: -33.6061, lng: 151.1219 },
+                    { name: "Berowra Waters Café", lat: -33.6014, lng: 151.1264 },
+                    { name: "Hawkesbury Lookout", lat: -33.6167, lng: 150.65 },
+                    { name: "North Rocks Dam", lat: -33.7686, lng: 151.0189 }
+                ],
+                desc: "Quiet pockets and river ferries. The ideal low-stress drive with plenty of throttle-variation opportunities without high strain.",
+                cafe: "Berowra Waters Marina Café"
+            }
+        ];
+
+        // Exquisite New Driving Routes (Strictly avoiding the banned list)
+        const PRE_GENERATED_ROUTES = [
+            {
+                region: "Southern Highlands",
+                title: "Southern Highlands Escarpment & Patisseries",
+                distance: "210 km (Round Trip)",
+                duration: "5.5 hours",
+                stops: ["Picton Historic Township", "Bowral Village", "Fitzroy Falls Lookout", "Mount Keira Summit"],
+                coords: [
+                    { name: "Parramatta CBD (Start)", lat: -33.815, lng: 151.0011 },
+                    { name: "Picton Historic Township", lat: -34.1808, lng: 150.6925 },
+                    { name: "Bowral (Gumnut Patisserie)", lat: -34.4791, lng: 150.4183 },
+                    { name: "Fitzroy Falls Lookout", lat: -34.6433, lng: 150.4808 },
+                    { name: "Mount Keira Summit", lat: -34.4039, lng: 150.8494 }
+                ],
+                desc: "Roll down the old Remembrance Driveway through scenic Picton, up to Bowral for world-class pastries, over to Fitzroy Falls, and descend back via Mount Keira.",
+                cafe: "Gumnut Patisserie, Bowral",
+                parking: "Picton: Main street side bays. Bowral: Large rear public car park off Station St. Fitzroy Falls: Dedicated National Parks car park.",
+                directions: "Depart Parramatta CBD south to Hume Hwy (M31) -> Exit toward Picton Road -> Remembrance Driveway -> Argyle St Picton -> Continue to Bowral via Old Hume Hwy -> B73 to Fitzroy Falls -> Return via Illawarra Hwy (M1) and Mount Keira Rd."
+            },
+            {
+                region: "Central Coast",
+                title: "Central Coast Ocean Breeze & Coastal Parks",
+                distance: "190 km (Round Trip)",
+                duration: "5.0 hours",
+                stops: ["Mt Penang Gardens", "Ettalong Beachfront", "Bouddi National Park Lookout", "Marie Byles Lookout"],
+                coords: [
+                    { name: "Parramatta CBD (Start)", lat: -33.815, lng: 151.0011 },
+                    { name: "Mt Penang Gardens", lat: -33.4244, lng: 151.3106 },
+                    { name: "Ettalong Beach (Coast 175 Café)", lat: -33.5133, lng: 151.3414 },
+                    { name: "Marie Byles Lookout", lat: -33.5283, lng: 151.3650 },
+                    { name: "Bouddi National Park", lat: -33.5161, lng: 151.4172 }
+                ],
+                desc: "A stunning seaside cruise using the M1 temporarily, then winding around coastal peninsulas. Low stress, gorgeous ocean glimpses, and cool breezes.",
+                cafe: "Coast 175 Cafe, Ettalong Beach",
+                parking: "Mt Penang: Vast open-air car park. Ettalong: Absolute beachside parking bays. Marie Byles: Dedicated gravel bay.",
+                directions: "M2 Motorway from Parramatta -> M1 Northbound -> Exit at Kariong -> Central Coast Hwy -> Mt Penang -> Woy Woy Rd to Ettalong Beach -> Scenic Rd to Marie Byles Lookout."
+            },
+            {
+                region: "Royal National Park",
+                title: "Grand Pacific Coast & Rainforest Cruise",
+                distance: "175 km (Round Trip)",
+                duration: "4.5 hours",
+                stops: ["Audley Weir", "Bald Hill Lookout (Stanwell Tops)", "Thirroul Seaside Café", "Sea Cliff Bridge Viewpoint"],
+                coords: [
+                    { name: "Parramatta CBD (Start)", lat: -33.815, lng: 151.0011 },
+                    { name: "Audley Weir", lat: -34.0782, lng: 151.0601 },
+                    { name: "Bald Hill Lookout", lat: -34.2185, lng: 150.9983 },
+                    { name: "Sea Cliff Bridge Viewpoint", lat: -34.2542, lng: 150.9722 },
+                    { name: "Thirroul Seaside Cafe", lat: -34.3183, lng: 150.8983 }
+                ],
+                desc: "An absolute classic. Wind slowly through the lush, shaded canopy of the world's second-oldest National Park, emerging to dramatic ocean cliffs.",
+                cafe: "Earth's Elements or Honest Don's in Thirroul",
+                parking: "Audley Weir: Multiple flat car parks near the river. Bald Hill: Large, newly paved clifftop parking. Thirroul: Safe street parking off the highway.",
+                directions: "A6 south from Parramatta -> Princes Highway -> Turn left into Royal National Park (Sir Bertram Stevens Dr) -> Audley Rd -> Drive south through park -> Exit to Lawrence Hargrave Dr -> Bald Hill Lookout -> Sea Cliff Bridge -> Thirroul."
+            }
+        ];
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('upcoming');
+            const [selectedDrive, setSelectedDrive] = useState(UPCOMING_DRIVES[0]);
+            const [generatedRoute, setGeneratedRoute] = useState(null);
+            const [isGenerating, setIsGenerating] = useState(false);
+            const mapRef = useRef(null);
+            const leafletMap = useRef(null);
+            const markerGroupRef = useRef(null);
+
+            // Re-render map markers when selected drive or generated route updates
+            useEffect(() => {
+                if (!mapRef.current) return;
+
+                // Initialize map if it doesn't exist
+                if (!leafletMap.current) {
+                    leafletMap.current = L.map(mapRef.current, {
+                        center: [-33.6, 150.8],
+                        zoom: 9,
+                        zoomControl: false
+                    });
+                    
+                    // Premium minimal map tiles
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+                    }).addTo(leafletMap.current);
+
+                    L.control.zoom({ position: 'bottomright' }).addTo(leafletMap.current);
+                    markerGroupRef.current = L.layerGroup().addTo(leafletMap.current);
+                }
+
+                // Clear old markers
+                markerGroupRef.current.clearLayers();
+
+                // Determine active path/points
+                const currentData = activeTab === 'generate' && generatedRoute ? generatedRoute : selectedDrive;
+                
+                if (currentData && currentData.coords) {
+                    const latlngs = currentData.coords.map(c => [c.lat, c.lng]);
+                    
+                    // Draw route polyline
+                    const polyline = L.polyline(latlngs, { 
+                        color: '#10b981', 
+                        weight: 4,
+                        opacity: 0.8,
+                        dashArray: '5, 10' 
+                    }).addTo(markerGroupRef.current);
+
+                    // Drop Custom Markers
+                    currentData.coords.forEach((coord, index) => {
+                        const isStart = index === 0;
+                        const markerColor = isStart ? '#ef4444' : '#10b981';
+                        
+                        const customIcon = L.divIcon({
+                            className: 'custom-div-icon',
+                            html: `<div style="background-color: ${markerColor}; width: 14px; height: 14px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
+                            iconSize: [14, 14],
+                            iconAnchor: [7, 7]
+                        });
+
+                        L.marker([coord.lat, coord.lng], { icon: customIcon })
+                            .bindPopup(`<strong class="text-slate-900">${coord.name}</strong>`)
+                            .addTo(markerGroupRef.current);
+                    });
+
+                    // Auto-adjust view to fit route
+                    leafletMap.current.fitBounds(polyline.getBounds(), { padding: [40, 40] });
+                }
+            }, [selectedDrive, generatedRoute, activeTab]);
+
+            const triggerAiGenerator = () => {
+                setIsGenerating(true);
+                setTimeout(() => {
+                    // Pick a fresh pre-generated premium route
+                    const randomIndex = Math.floor(Math.random() * PRE_GENERATED_ROUTES.length);
+                    setGeneratedRoute(PRE_GENERATED_ROUTES[randomIndex]);
+                    setIsGenerating(false);
+                }, 1200);
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col bg-slate-950">
+                    {/* Header */}
+                    <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-emerald-500 text-slate-950 p-2.5 rounded-xl font-bold text-xl shadow-lg shadow-emerald-500/20">
+                                🚗
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-bold text-white tracking-tight">Sunday Drives <span className="text-emerald-400">AI</span></h1>
+                                <p className="text-xs text-slate-400">Tailored scenic journeys starting from Parramatta, NSW</p>
+                            </div>
+                        </div>
+
+                        {/* Navigation Tabs */}
+                        <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                            <button 
+                                onClick={() => setActiveTab('upcoming')}
+                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'upcoming' ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-slate-200'}`}>
+                                Upcoming Walks
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('generate')}
+                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'generate' ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-slate-200'}`}>
+                                AI Route Generator
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('banned')}
+                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'banned' ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-slate-200'}`}>
+                                Saved / Visited ({BANNED_LOCATIONS.length})
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* Stats Dashboard Banner */}
+                    <section className="bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-950 px-6 py-8 border-b border-slate-800">
+                        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6">
+                            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80">
+                                <span className="text-xs text-slate-400 block mb-1 font-medium">Completed Drives</span>
+                                <span className="text-3xl font-bold text-white tracking-tight">0</span>
+                                <span className="text-xs text-emerald-400 block mt-1">Car Break-in Stage 1</span>
+                            </div>
+                            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80">
+                                <span className="text-xs text-slate-400 block mb-1 font-medium">Distance Covered</span>
+                                <span className="text-3xl font-bold text-white tracking-tight">~0 km</span>
+                                <span className="text-xs text-slate-500 block mt-1">Target: 1,500km</span>
+                            </div>
+                            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80">
+                                <span className="text-xs text-slate-400 block mb-1 font-medium">Engine Break-in Status</span>
+                                <div className="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
+                                    <div className="bg-amber-500 h-full w-[8%]"></div>
+                                </div>
+                                <span className="text-[10px] text-amber-400 block mt-1">Under 4,000 RPM Preferred</span>
+                            </div>
+                            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80">
+                                <span className="text-xs text-slate-400 block mb-1 font-medium">Excluded Coordinates</span>
+                                <span className="text-3xl font-bold text-emerald-400 tracking-tight">12</span>
+                                <span className="text-xs text-slate-400 block mt-1">Safely Blacklisted</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Main Layout */}
+                    <main className="flex-1 max-w-7xl w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        
+                        {/* LEFT COLUMN: Map view (sticky for luxury UX) */}
+                        <div className="lg:col-span-7 flex flex-col h-[500px] lg:h-[calc(100vh-320px)] sticky top-24">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="font-semibold text-slate-200 text-sm flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    Interactive Route Blueprint (Starts in Parramatta)
+                                </h3>
+                                <span className="text-xs text-slate-400 bg-slate-900 px-3 py-1 rounded-full border border-slate-800">
+                                    {activeTab === 'generate' && generatedRoute ? generatedRoute.distance : selectedDrive.distance}
+                                </span>
+                            </div>
+                            <div ref={mapRef} className="flex-1 w-full rounded-2xl border border-slate-800 shadow-xl overflow-hidden"></div>
+                        </div>
+
+                        {/* RIGHT COLUMN: Interactive Control & Details */}
+                        <div className="lg:col-span-5 flex flex-col gap-6 overflow-y-auto max-h-[calc(100vh-220px)] pr-1 custom-scrollbar">
+                            
+                            {/* TAB 1: Upcoming Drives */}
+                            {activeTab === 'upcoming' && (
+                                <div className="space-y-6">
+                                    <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                                        <h4 className="text-xs font-semibold text-emerald-400 uppercase tracking-widest mb-3">Planned Sunday Calendar</h4>
+                                        <div className="space-y-3">
+                                            {UPCOMING_DRIVES.map((drive, idx) => (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => setSelectedDrive(drive)}
+                                                    className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between ${selectedDrive.title === drive.title ? 'bg-emerald-950/30 border-emerald-500/70' : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'}`}>
+                                                    <div>
+                                                        <span className="text-xs text-slate-400 block">{drive.date}</span>
+                                                        <span className="font-bold text-white text-base block mt-0.5">{drive.title}</span>
+                                                        <span className="text-xs text-emerald-400 mt-1 inline-block">{drive.stops.length} stops</span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-sm font-semibold text-slate-300 block">{drive.distance}</span>
+                                                        <span className="text-xs text-slate-500 block">{drive.duration}</span>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Focus Drive Details */}
+                                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
+                                        <div>
+                                            <span className="text-xs text-emerald-400 font-semibold">{selectedDrive.date} Cruise</span>
+                                            <h2 className="text-2xl font-bold text-white mt-1 serif-font">{selectedDrive.title}</h2>
+                                            <p className="text-sm text-slate-300 mt-2 leading-relaxed">{selectedDrive.desc}</p>
+                                        </div>
+
+                                        <div className="bg-slate-950/80 p-4 rounded-xl border border-slate-800/80 space-y-3">
+                                            <div className="flex justify-between text-xs text-slate-400">
+                                                <span>Estimated Departure:</span>
+                                                <span className="text-white font-medium">6:30 AM from Parramatta CBD</span>
+                                            </div>
+                                            <div className="flex justify-between text-xs text-slate-400">
+                                                <span>Planned Café Stop:</span>
+                                                <span className="text-emerald-400 font-semibold text-right">{selectedDrive.cafe}</span>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Planned Scenic Stops</h4>
+                                            <ol className="relative border-l border-slate-800 ml-2 space-y-4">
+                                                {selectedDrive.stops.map((stop, idx) => (
+                                                    <li key={idx} className="mb-4 ml-6">
+                                                        <span className="absolute flex items-center justify-center w-5 h-5 bg-slate-800 text-emerald-400 text-xs font-bold rounded-full -left-[11px] ring-4 ring-slate-950">
+                                                            {idx + 1}
+                                                        </span>
+                                                        <h5 className="font-semibold text-white text-sm">{stop}</h5>
+                                                        <p className="text-xs text-slate-400 mt-0.5">Verified NSW location. Scenic vistas & smooth run-offs.</p>
+                                                    </li>
+                                                ))}
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* TAB 2: AI Route Generator */}
+                            {activeTab === 'generate' && (
+                                <div className="space-y-6">
+                                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+                                        <div>
+                                            <h3 className="text-lg font-bold text-white serif-font">Engine Break-in Guard Generator</h3>
+                                            <p className="text-sm text-slate-400 mt-1">
+                                                Generates new premium routes that strictly omit the 12 already-explored areas in Greater Sydney, Central Coast, and the Highlands.
+                                            </p>
+                                        </div>
+
+                                        <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
+                                            <div className="flex items-center justify-between text-xs text-slate-400">
+                                                <span>Strict Location Blacklist Filter:</span>
+                                                <span className="text-emerald-400 font-bold">ACTIVE</span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs text-slate-400">
+                                                <span>Starting Point:</span>
+                                                <span className="text-white">Parramatta CBD (0.0km)</span>
+                                            </div>
+                                        </div>
+
+                                        <button 
+                                            onClick={triggerAiGenerator}
+                                            disabled={isGenerating}
+                                            className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-800 text-slate-950 font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-2">
+                                            {isGenerating ? (
+                                                <>
+                                                    <span className="animate-spin inline-block w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full"></span>
+                                                    Analyzing NSW Grid...
+                                                </>
+                                            ) : (
+                                                "Generate Brand New Route"
+                                            )}
+                                        </button>
+                                    </div>
+
+                                    {/* Generated Route Details Card */}
+                                    {generatedRoute ? (
+                                        <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-6 space-y-5 animate-fadeIn">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <span className="text-xs bg-emerald-950 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/20 font-semibold">{generatedRoute.region} Route</span>
+                                                    <h2 className="text-xl font-bold text-white mt-2 serif-font">{generatedRoute.title}</h2>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+                                                    <span className="text-[10px] text-slate-500 block">Total Est. Distance</span>
+                                                    <span className="font-bold text-white text-sm">{generatedRoute.distance}</span>
+                                                </div>
+                                                <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+                                                    <span className="text-[10px] text-slate-500 block">Driving Time</span>
+                                                    <span className="font-bold text-white text-sm">{generatedRoute.duration}</span>
+                                                </div>
+                                            </div>
+
+                                            <p className="text-sm text-slate-300 leading-relaxed">{generatedRoute.desc}</p>
+
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <h4 className="text-xs font-bold text-slate-400 uppercase">Café / Bakery Stop</h4>
+                                                    <p className="text-sm text-emerald-400 font-semibold mt-1">☕ {generatedRoute.cafe}</p>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-xs font-bold text-slate-400 uppercase">Break-in Parking Insights</h4>
+                                                    <p className="text-xs text-slate-400 mt-1">{generatedRoute.parking}</p>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-xs font-bold text-slate-400 uppercase">Turn-by-Turn GPS Overview</h4>
+                                                    <p className="text-xs text-slate-400 bg-slate-950 p-3 rounded-lg border border-slate-800 mt-1 font-mono leading-relaxed">{generatedRoute.directions}</p>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Waypoint Stops</h4>
+                                                <ol className="relative border-l border-slate-800 ml-2 space-y-4">
+                                                    {generatedRoute.stops.map((stop, idx) => (
+                                                        <li key={idx} className="mb-4 ml-6">
+                                                            <span className="absolute flex items-center justify-center w-5 h-5 bg-emerald-950 text-emerald-400 text-xs font-bold rounded-full -left-[11px] ring-4 ring-slate-950 border border-emerald-500/40">
+                                                                {idx + 1}
+                                                            </span>
+                                                            <h5 className="font-semibold text-white text-sm">{stop}</h5>
+                                                        </li>
+                                                    ))}
+                                                </ol>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="border border-dashed border-slate-800 rounded-2xl p-8 text-center">
+                                            <span className="text-3xl block mb-2">🧭</span>
+                                            <p className="text-sm text-slate-500">Press the generate button above to discover curated, smooth drives with no repeated stops.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* TAB 3: Excluded/Visited Locations */}
+                            {activeTab === 'banned' && (
+                                <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-white serif-font">Blacklisted & Visited Locations</h3>
+                                        <p className="text-sm text-slate-400 mt-1">
+                                            To keep every weekend fresh, our algorithms strictly ignore these 12 places when calculating new coordinates.
+                                        </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                                        {BANNED_LOCATIONS.map((loc, idx) => (
+                                            <div key={idx} className="bg-slate-950/60 p-3 rounded-lg border border-slate-800 flex items-center gap-2">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+                                                <span className="text-xs font-medium text-slate-300">{loc}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Car Break-in Advice Card */}
+                            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 space-y-3">
+                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                    🔧 Engine Break-In Protocol Guard
+                                </h4>
+                                <ul className="text-xs text-slate-400 space-y-1.5 list-disc pl-4">
+                                    <li>Avoid staying at the same constant RPM on freeways for too long; downshift periodically.</li>
+                                    <li>Warm up the engine fully before taking on steep mountain accents.</li>
+                                    <li>Gentle braking for the first 300km to bed-in rotors and pads correctly.</li>
+                                    <li>Strictly limit absolute engine throttle to 60-70% capacity until the 1,500km threshold.</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="border-t border-slate-800 py-6 mt-12 bg-slate-950 text-center text-xs text-slate-500">
+                        <p>© 2026 Sunday Drives App. Handcrafted for pristine NSW exploration.</p>
+                    </footer>
+                </div>
+            );
+        }
+
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
+    </script>
+</body>
+</html>
