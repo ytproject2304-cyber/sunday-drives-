@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Route as RouteIcon, Mail, Lock, Github, Chrome, Loader2 } from 'lucide-react';
+import { Route as RouteIcon, Mail, Lock, Shield, Globe, Loader2 } from 'lucide-react';
 
 interface AuthProps {
     view: 'sign-in' | 'sign-up';
@@ -126,14 +126,14 @@ const Auth: React.FC<AuthProps> = ({ view, onViewChange }) => {
                             onClick={() => handleSocialAuth('google')}
                             className="flex items-center justify-center gap-2 bg-slate-950 border border-slate-800 hover:border-slate-700 py-2.5 rounded-xl text-sm font-medium text-slate-300 transition-all"
                         >
-                            <Chrome className="w-4 h-4" />
+                            <Globe className="w-4 h-4" />
                             <span>Google</span>
                         </button>
                         <button 
                             onClick={() => handleSocialAuth('github')}
                             className="flex items-center justify-center gap-2 bg-slate-950 border border-slate-800 hover:border-slate-700 py-2.5 rounded-xl text-sm font-medium text-slate-300 transition-all"
                         >
-                            <Github className="w-4 h-4" />
+                            <Shield className="w-4 h-4" />
                             <span>GitHub</span>
                         </button>
                     </div>

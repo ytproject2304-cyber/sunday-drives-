@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabase';
 import Dashboard from './components/Dashboard';
 import Auth from './components/Auth';
-import { User } from '@supabase/supabase-js';
 
 function App() {
   const [session, setSession] = useState<any>(null);

@@ -1,4 +1,4 @@
-import { Drive, Route } from '../types';
+import type { Drive, Route } from '../types';
 
 export const BANNED_LOCATIONS = [
     "Barnetts Lookout", "Berowra Waters Café", "Hawkesbury Lookout", "North Rocks Dam",

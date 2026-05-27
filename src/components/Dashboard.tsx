@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { BANNED_LOCATIONS, UPCOMING_DRIVES, PRE_GENERATED_ROUTES } from '../constants/data';
-import { Drive, Route } from '../types';
+import type { Drive, Route } from '../types';
 import { supabase } from '../lib/supabase';
-import { LogOut, MapPin, Coffee, Timer, Route as RouteIcon, ShieldCheck, Zap, AlertTriangle } from 'lucide-react';
+import { LogOut, Timer, Route as RouteIcon, ShieldCheck, Zap, AlertTriangle } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'upcoming' | 'generate' | 'banned'>('upcoming');
